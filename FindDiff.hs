@@ -4,6 +4,23 @@ import CSyntax
 
 newtype SEM s a = M (s -> Either () (s, a))
 
+instance Functor (SEM s) where
+    fmap f (M x) = M $ \s ->
+        case x s of
+            Left e -> Left e
+            Right (s', x') -> Right (s', f x')
+
+instance Applicative (SEM s) where
+    pure a = M $ \s -> Right (s, a)
+    M f <*> M x = M $ \s ->
+        case f s of
+            Left e -> Left e
+            Right (s', f') ->
+                case x s' of
+                    Left e -> Left e
+                    Right (s'', x') ->
+                        Right (s'', f' x')
+
 instance Monad (SEM s) where
     return a = M $ \ s -> Right (s, a)
     M a >>= f = M $ \ s ->

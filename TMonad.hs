@@ -9,6 +9,17 @@ import IUtil(iNSubstId1)
 
 newtype M s a = M (s -> Either EMsg (s, a))
 
+instance Applicative (M s) where
+    pure a = M $ \s -> Right (s, a)
+    M f <*> M x = M $ \s ->
+        case f s of
+            Left e -> Left e
+            Right (s', f') ->
+                case x s' of 
+                    Left e -> Left e
+                    Right (s'', x') ->
+                        Right (s'', f' x')
+
 instance Monad (M s) where
     return a = M $ \ s -> Right (s, a)
     M a >>= f = M $ \ s ->

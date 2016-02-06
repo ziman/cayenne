@@ -9,6 +9,7 @@ import System.Environment
 import System.Cmd
 import System.Exit
 import System.Directory(removeFile, createDirectory)
+import Control.Exception
 import Libs.ListUtil(chopList)
 import Libs.GetPid
 import Libs.Parse
@@ -58,7 +59,7 @@ main = do
         ifIO (verbose flags) $ putStr version
 	file <- readFile name 
                 `catch`
-                \ _ -> messageExit serror ("Cannot open source file `"++name++"'\n")
+                \ (SomeException _) -> messageExit serror ("Cannot open source file `"++name++"'\n")
         file' <- expandInclude flags file
 	case parseSrc flags name file' of
 	    (ErrProgram msg, _) -> messageExit serror (prEMsg msg++"\n")
@@ -68,7 +69,7 @@ main = do
      Right (flags, [name]) | hasSuf ifSuffixBin name -> do
 	file <- readFile name 
                 `catch`
-                \ _ -> messageExit serror ("Cannot binary interface file `"++name++"'\n")
+                \ (SomeException _) -> messageExit serror ("Cannot binary interface file `"++name++"'\n")
 	let (_, ii) = iInterfaceFromBytes preStrTable file
 	putStr (ppReadable (ifcIToC False ii))
      Right (flags, [name]) | isModuleString name -> do
@@ -137,8 +138,8 @@ compileModule op name suf flags tbl mod@(CModule nats _) = do
 	        rc <- system cmd
 		ifIO (keepLml flags) $
                     system ("mv " ++ mname ++ " " ++ name_ ++  lmlSuffix)
-		removeFile tname `catch` const (return ())
-	        removeFile mname `catch` const (return ())
+		removeFile tname `catch` (\(SomeException _) -> return ())
+	        removeFile mname `catch` (\(SomeException _) -> return ())
 		ifIO (rc /= ExitSuccess) $
 		    exitWith rc
 
@@ -171,7 +172,7 @@ compileModule op name suf flags tbl mod@(CModule nats _) = do
 		  do
                     system ("mv " ++ mname ++ " " ++ hsname)
 --		removeFile tname `catch` const (return ())
-	        removeFile mname `catch` const (return ())
+	        removeFile mname `catch` (\(SomeException _) -> return ())
 		ifIO (rc /= ExitSuccess) $
 		    exitWith rc
 
@@ -230,7 +231,7 @@ makeDirPath :: String -> IO ()
 makeDirPath s =
     let dirs = init (chopList (breakAt '/') s)
         paths = scanl1 (\x y -> x ++ "/" ++ y) dirs
-	createDirectory' s = createDirectory s `catch` \ _ -> return ()
+	createDirectory' s = createDirectory s `catch` \ (SomeException _) -> return ()
     in  mapM_ createDirectory' paths
 
 srcSuffix = "cy"
@@ -317,7 +318,7 @@ getInterface flags path i tbl = do
             ifIO (verbose flags) $
                 putStr ("read "++name++"\n")
 	    return (file, name)
-	  `catch` \ _ -> io
+	  `catch` \ (SomeException _) -> io
     (str, name) <- foldr f (messageExit serror (prPosition (getIdPosition i) ++ 
                         ", Cannot find interface for `"++getIdString i++"'\n")) path
     case parseIface tbl s str of
@@ -333,7 +334,7 @@ getInterfaceI flags path i tbl = do
             ifIO (verbose flags) $
                 putStr ("read "++name++"\n")
 	    return (file, name)
-	  `catch` \ _ -> io
+	  `catch` \ (SomeException _) -> io
     (file, name) <- foldr f (messageExit serror (prPosition (getIdPosition i) ++ 
                         ", Cannot find interface for `"++getIdString i++"'\n")) path
     case iInterfaceFromBytes tbl file of
@@ -520,7 +521,7 @@ getWarn (IWarn w _) = [w]
 getWarn _ = []
 
 getEnvDef :: String -> String -> IO String
-getEnvDef e d = getEnv e `catch` \ _ -> return d
+getEnvDef e d = getEnv e `catch` \ (SomeException _) -> return d
 
 ---
 -- XXX
